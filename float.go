@@ -53,7 +53,7 @@ func (f Float) ValueOrZero() float64 {
 // It supports number and null input.
 // 0 will not be considered a null Float.
 func (f *Float) UnmarshalJSON(data []byte) error {
-	if bytes.Equal(data, nullBytes) {
+	if bytes.Equal(data, NullBytes) {
 		f.Valid = false
 		return nil
 	}

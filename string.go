@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"encoding/json"
+	"strings"
 
 	"github.com/sujit-baniya/null/convert"
 )
@@ -35,6 +36,10 @@ func NewString(s string, valid bool) String {
 		Valid:  valid,
 		Set:    true,
 	}
+}
+
+func (s String) IsZeroOrBlank() bool {
+	return !s.Valid || strings.ReplaceAll(s.String, " ", "") == ""
 }
 
 // IsValid returns true if this carries and explicit value and
