@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/sujit-baniya/null/convert"
+	"github.com/oarkflow/null/convert"
 )
 
 // JSON is a nullable []byte that contains JSON.

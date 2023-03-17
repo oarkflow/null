@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/sujit-baniya/null/convert"
+	"github.com/oarkflow/null/convert"
 )
 
 // Float32 is a nullable float32.

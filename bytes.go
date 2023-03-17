@@ -5,7 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
-	"github.com/sujit-baniya/null/convert"
+	"github.com/oarkflow/null/convert"
 )
 
 // NullBytes is a global byte slice of JSON null

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/sujit-baniya/null/convert"
+	"github.com/oarkflow/null/convert"
 )
 
 // Uint is an nullable uint.

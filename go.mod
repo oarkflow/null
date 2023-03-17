@@ -1,3 +1,3 @@
-module github.com/sujit-baniya/null
+module github.com/oarkflow/null
 
 go 1.19

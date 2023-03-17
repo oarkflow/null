@@ -8,7 +8,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/sujit-baniya/null/convert"
+	"github.com/oarkflow/null/convert"
 )
 
 // Uint8 is an nullable uint8.

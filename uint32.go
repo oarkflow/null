@@ -5,7 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"github.com/sujit-baniya/null/convert"
+	"github.com/oarkflow/null/convert"
 	"math"
 	"strconv"
 )
