@@ -1,3 +1,3 @@
-module github.com/guregu/null/v5
+module github.com/oarkflow/null
 
 go 1.22
