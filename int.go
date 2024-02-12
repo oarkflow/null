@@ -1,140 +1,110 @@
 package null
 
 import (
-	"bytes"
-	"database/sql/driver"
-	"encoding/json"
+	"database/sql"
 	"strconv"
 
-	"github.com/oarkflow/null/convert"
+	"github.com/oarkflow/null/internal"
 )
 
-// Int is an nullable int.
+// Int is an nullable int64.
+// It does not consider zero values to be null.
+// It will decode to null, not zero, if null.
 type Int struct {
-	Int   int
-	Valid bool
-	Set   bool
+	sql.NullInt64
 }
 
-// NewInt creates a new Int
-func NewInt(i int, valid bool) Int {
+// Int64 is an alias for Int.
+type Int64 = Int
+
+// NewInt creates a new Int.
+func NewInt(i int64, valid bool) Int {
 	return Int{
-		Int:   i,
-		Valid: valid,
-		Set:   true,
+		NullInt64: sql.NullInt64{
+			Int64: i,
+			Valid: valid,
+		},
 	}
 }
 
 // IntFrom creates a new Int that will always be valid.
-func IntFrom(i int) Int {
+func IntFrom(i int64) Int {
 	return NewInt(i, true)
 }
 
 // IntFromPtr creates a new Int that be null if i is nil.
-func IntFromPtr(i *int) Int {
+func IntFromPtr(i *int64) Int {
 	if i == nil {
 		return NewInt(0, false)
 	}
 	return NewInt(*i, true)
 }
 
-// IsValid returns true if this carries and explicit value and
-// is not null.
-func (i Int) IsValid() bool {
-	return i.Set && i.Valid
-}
-
-// IsSet returns true if this carries an explicit value (null inclusive)
-func (i Int) IsSet() bool {
-	return i.Set
+// ValueOrZero returns the inner value if valid, otherwise zero.
+func (i Int) ValueOrZero() int64 {
+	if !i.Valid {
+		return 0
+	}
+	return i.Int64
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
+// It supports number, string, and null input.
+// 0 will not be considered a null Int.
 func (i *Int) UnmarshalJSON(data []byte) error {
-	i.Set = true
-
-	if bytes.Equal(data, NullBytes) {
-		i.Valid = false
-		i.Int = 0
-		return nil
-	}
-
-	var x int64
-	if err := json.Unmarshal(data, &x); err != nil {
-		return err
-	}
-
-	i.Int = int(x)
-	i.Valid = true
-	return nil
+	return internal.UnmarshalIntJSON(data, &i.Int64, &i.Valid, 64, strconv.ParseInt)
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
+// It will unmarshal to a null Int if the input is blank.
+// It will return an error if the input is not an integer, blank, or "null".
 func (i *Int) UnmarshalText(text []byte) error {
-	i.Set = true
-	if len(text) == 0 {
-		i.Valid = false
-		return nil
-	}
-	var err error
-	res, err := strconv.ParseInt(string(text), 10, 0)
-	i.Valid = err == nil
-	if i.Valid {
-		i.Int = int(res)
-	}
-	return err
+	return internal.UnmarshalIntText(text, &i.Int64, &i.Valid, 64, strconv.ParseInt)
 }
 
 // MarshalJSON implements json.Marshaler.
+// It will encode null if this Int is null.
 func (i Int) MarshalJSON() ([]byte, error) {
 	if !i.Valid {
-		return NullBytes, nil
+		return []byte("null"), nil
 	}
-	return []byte(strconv.FormatInt(int64(i.Int), 10)), nil
+	return []byte(strconv.FormatInt(i.Int64, 10)), nil
 }
 
 // MarshalText implements encoding.TextMarshaler.
+// It will encode a blank string if this Int is null.
 func (i Int) MarshalText() ([]byte, error) {
 	if !i.Valid {
 		return []byte{}, nil
 	}
-	return []byte(strconv.FormatInt(int64(i.Int), 10)), nil
+	return []byte(strconv.FormatInt(i.Int64, 10)), nil
 }
 
 // SetValid changes this Int's value and also sets it to be non-null.
-func (i *Int) SetValid(n int) {
-	i.Int = n
+func (i *Int) SetValid(n int64) {
+	i.Int64 = n
 	i.Valid = true
-	i.Set = true
 }
 
 // Ptr returns a pointer to this Int's value, or a nil pointer if this Int is null.
-func (i Int) Ptr() *int {
+func (i Int) Ptr() *int64 {
 	if !i.Valid {
 		return nil
 	}
-	return &i.Int
+	return &i.Int64
 }
 
 // IsZero returns true for invalid Ints, for future omitempty support (Go 1.4?)
+// A non-null Int with a 0 value will not be considered zero.
 func (i Int) IsZero() bool {
 	return !i.Valid
 }
 
-// Scan implements the Scanner interface.
-func (i *Int) Scan(value interface{}) error {
-	if value == nil {
-		i.Int, i.Valid, i.Set = 0, false, false
-		return nil
-	}
-	i.Valid, i.Set = true, true
-	return convert.ConvertAssign(&i.Int, value)
+// Equal returns true if both ints have the same value or are both null.
+func (i Int) Equal(other Int) bool {
+	return i.Valid == other.Valid && (!i.Valid || i.Int64 == other.Int64)
 }
 
-// Value implements the driver Valuer interface.
-func (i Int) Value() (driver.Value, error) {
-	if !i.Valid {
-		return nil, nil
-	}
-	return int64(i.Int), nil
+func (i Int) value() (int64, bool) {
+	return i.Int64, i.Valid
 }

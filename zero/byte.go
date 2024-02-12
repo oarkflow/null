@@ -1,4 +1,4 @@
-package null
+package zero
 
 import (
 	"database/sql"
@@ -7,34 +7,35 @@ import (
 	"github.com/oarkflow/null/internal"
 )
 
-// Byte is an nullable byte.
-// It does not consider zero values to be null.
-// It will decode to null, not zero, if null.
+// Byte is a nullable byte.
+// JSON marshals to zero if null.
+// Considered null to SQL if zero.
 type Byte struct {
 	sql.NullByte
 }
 
-// NewByte creates a new Byte.
-func NewByte(b byte, valid bool) Byte {
+// NewByte creates a new Byte
+func NewByte(i byte, valid bool) Byte {
 	return Byte{
 		NullByte: sql.NullByte{
-			Byte:  b,
+			Byte:  i,
 			Valid: valid,
 		},
 	}
 }
 
-// ByteFrom creates a new Byte that will always be valid.
-func ByteFrom(b byte) Byte {
-	return NewByte(b, true)
+// ByteFrom creates a new Byte that will be null if zero.
+func ByteFrom(i byte) Byte {
+	return NewByte(i, i != 0)
 }
 
 // ByteFromPtr creates a new Byte that be null if i is nil.
-func ByteFromPtr(b *byte) Byte {
-	if b == nil {
+func ByteFromPtr(i *byte) Byte {
+	if i == nil {
 		return NewByte(0, false)
 	}
-	return NewByte(*b, true)
+	n := NewByte(*i, true)
+	return n
 }
 
 // ValueOrZero returns the inner value if valid, otherwise zero.
@@ -46,35 +47,47 @@ func (b Byte) ValueOrZero() byte {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-// It supports number, string, and null input.
-// 0 will not be considered a null Byte.
+// It supports number and null input.
+// 0 will be considered a null Byte.
 func (b *Byte) UnmarshalJSON(data []byte) error {
-	return internal.UnmarshalIntJSON(data, &b.Byte, &b.Valid, 8, strconv.ParseUint)
+	err := internal.UnmarshalIntJSON(data, &b.Byte, &b.Valid, 8, strconv.ParseUint)
+	if err != nil {
+		return err
+	}
+	b.Valid = b.Byte != 0
+	return nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-// It will unmarshal to a null Byte if the input is blank.
+// It will unmarshal to a null Byte if the input is a blank, or zero.
 // It will return an error if the input is not an integer, blank, or "null".
 func (b *Byte) UnmarshalText(text []byte) error {
-	return internal.UnmarshalIntText(text, &b.Byte, &b.Valid, 8, strconv.ParseUint)
+	err := internal.UnmarshalIntText(text, &b.Byte, &b.Valid, 8, strconv.ParseUint)
+	if err != nil {
+		return err
+	}
+	b.Valid = b.Byte != 0
+	return nil
 }
 
 // MarshalJSON implements json.Marshaler.
-// It will encode null if this Byte is null.
+// It will encode 0 if this Byte is null.
 func (b Byte) MarshalJSON() ([]byte, error) {
+	n := b.Byte
 	if !b.Valid {
-		return []byte("null"), nil
+		n = 0
 	}
-	return []byte(strconv.FormatInt(int64(b.Byte), 10)), nil
+	return []byte(strconv.FormatInt(int64(n), 10)), nil
 }
 
 // MarshalText implements encoding.TextMarshaler.
-// It will encode a blank string if this Byte is null.
+// It will encode a zero if this Byte is null.
 func (b Byte) MarshalText() ([]byte, error) {
+	n := b.Byte
 	if !b.Valid {
-		return []byte{}, nil
+		n = 0
 	}
-	return []byte(strconv.FormatInt(int64(b.Byte), 10)), nil
+	return []byte(strconv.FormatInt(int64(n), 10)), nil
 }
 
 // SetValid changes this Byte's value and also sets it to be non-null.
@@ -91,15 +104,14 @@ func (b Byte) Ptr() *byte {
 	return &b.Byte
 }
 
-// IsZero returns true for invalid Bytes, for future omitempty support (Go 1.4?)
-// A non-null Byte with a 0 value will not be considered zero.
+// IsZero returns true for null or zero Bytes, for future omitempty support (Go 1.4?)
 func (b Byte) IsZero() bool {
-	return !b.Valid
+	return !b.Valid || b.Byte == 0
 }
 
-// Equal returns true if both ints have the same value or are both null.
+// Equal returns true if both ints have the same value or are both either null or zero.
 func (b Byte) Equal(other Byte) bool {
-	return b.Valid == other.Valid && (!b.Valid || b.Byte == other.Byte)
+	return b.ValueOrZero() == other.ValueOrZero()
 }
 
 func (b Byte) value() (int64, bool) {

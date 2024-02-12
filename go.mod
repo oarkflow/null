@@ -1,3 +1,3 @@
-module github.com/oarkflow/null
+module github.com/guregu/null/v5
 
-go 1.19
+go 1.22

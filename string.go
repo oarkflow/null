@@ -1,19 +1,20 @@
+// Package null contains SQL types that consider zero input and null input as separate values,
+// with convenient support for JSON and text marshaling.
+// Types in this package will always encode to their null value if null.
+// Use the zero subpackage if you want zero values and null to be treated the same.
 package null
 
 import (
-	"bytes"
-	"database/sql/driver"
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
-
-	"github.com/oarkflow/null/convert"
 )
 
 // String is a nullable string. It supports SQL and JSON serialization.
+// It will marshal to null if null. Blank string input will be considered null.
 type String struct {
-	String string
-	Valid  bool
-	Set    bool
+	sql.NullString
 }
 
 // StringFrom creates a new String that will never be blank.
@@ -29,41 +30,34 @@ func StringFromPtr(s *string) String {
 	return NewString(*s, true)
 }
 
+// ValueOrZero returns the inner value if valid, otherwise zero.
+func (s String) ValueOrZero() string {
+	if !s.Valid {
+		return ""
+	}
+	return s.String
+}
+
 // NewString creates a new String
 func NewString(s string, valid bool) String {
 	return String{
-		String: s,
-		Valid:  valid,
-		Set:    true,
+		NullString: sql.NullString{
+			String: s,
+			Valid:  valid,
+		},
 	}
 }
 
-func (s String) IsZeroOrBlank() bool {
-	return !s.Valid || strings.ReplaceAll(s.String, " ", "") == ""
-}
-
-// IsValid returns true if this carries and explicit value and
-// is not null.
-func (s String) IsValid() bool {
-	return s.Set && s.Valid
-}
-
-// IsSet returns true if this carries an explicit value (null inclusive)
-func (s String) IsSet() bool {
-	return s.Set
-}
-
 // UnmarshalJSON implements json.Unmarshaler.
+// It supports string and null input. Blank string input does not produce a null String.
 func (s *String) UnmarshalJSON(data []byte) error {
-	s.Set = true
-	if bytes.Equal(data, NullBytes) {
-		s.String = ""
+	if len(data) > 0 && data[0] == 'n' {
 		s.Valid = false
 		return nil
 	}
 
 	if err := json.Unmarshal(data, &s.String); err != nil {
-		return err
+		return fmt.Errorf("null: couldn't unmarshal JSON: %w", err)
 	}
 
 	s.Valid = true
@@ -71,14 +65,16 @@ func (s *String) UnmarshalJSON(data []byte) error {
 }
 
 // MarshalJSON implements json.Marshaler.
+// It will encode null if this String is null.
 func (s String) MarshalJSON() ([]byte, error) {
 	if !s.Valid {
-		return NullBytes, nil
+		return []byte("null"), nil
 	}
 	return json.Marshal(s.String)
 }
 
 // MarshalText implements encoding.TextMarshaler.
+// It will encode a blank string when this String is null.
 func (s String) MarshalText() ([]byte, error) {
 	if !s.Valid {
 		return []byte{}, nil
@@ -87,15 +83,10 @@ func (s String) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
+// It will unmarshal to a null String if the input is a blank string.
 func (s *String) UnmarshalText(text []byte) error {
-	s.Set = true
-	if len(text) == 0 {
-		s.Valid = false
-		return nil
-	}
-
 	s.String = string(text)
-	s.Valid = true
+	s.Valid = s.String != ""
 	return nil
 }
 
@@ -103,7 +94,6 @@ func (s *String) UnmarshalText(text []byte) error {
 func (s *String) SetValid(v string) {
 	s.String = v
 	s.Valid = true
-	s.Set = true
 }
 
 // Ptr returns a pointer to this String's value, or a nil pointer if this String is null.
@@ -119,20 +109,12 @@ func (s String) IsZero() bool {
 	return !s.Valid
 }
 
-// Scan implements the Scanner interface.
-func (s *String) Scan(value interface{}) error {
-	if value == nil {
-		s.String, s.Valid, s.Set = "", false, false
-		return nil
-	}
-	s.Valid, s.Set = true, true
-	return convert.ConvertAssign(&s.String, value)
+// IsZeroOrBlank returns true for null empty strings or strings which consist only of blanks.
+func (s String) IsZeroOrBlank() bool {
+	return !s.Valid || strings.ReplaceAll(s.String, " ", "") == ""
 }
 
-// Value implements the driver Valuer interface.
-func (s String) Value() (driver.Value, error) {
-	if !s.Valid {
-		return nil, nil
-	}
-	return s.String, nil
+// Equal returns true if both strings have the same value or are both null.
+func (s String) Equal(other String) bool {
+	return s.Valid == other.Valid && (!s.Valid || s.String == other.String)
 }
